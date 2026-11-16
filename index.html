@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estudo P2 Sistemas Operacionais</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one question at a time in a central column, sticky progress bar on top, a grid of question numbers to jump around, and a separate "Resumo" tab with cheat sheets. */
+:root{
+  --bg:#f3f4f7; --surface:#ffffff; --sunken:#e9ebf1; --line:#d7dbe5;
+  --fg:#1b2030; --muted:#5d6579;
+  --accent:#2f56c9; --accent-soft:#e3e9fb;
+  --ok:#1d7a4c; --ok-soft:#dff3e8; --bad:#b4372e; --bad-soft:#fbe4e1;
+  --hint:#8a5a00; --hint-soft:#fbf0d9;
+  --term-bg:#1d2333; --term-fg:#d8e0f2; --term-prompt:#7fb3ff;
+  --f-display:"Space Grotesk",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12151d; --surface:#1a1f2a; --sunken:#222836; --line:#2f3646;
+  --fg:#e6e9f1; --muted:#9aa2b5;
+  --accent:#7d9cff; --accent-soft:#232d4a;
+  --ok:#5fcf93; --ok-soft:#173326; --bad:#ff8a7e; --bad-soft:#3a1f1d;
+  --hint:#f0c060; --hint-soft:#352b17;
+  --term-bg:#0c0f16; --term-fg:#d8e0f2; --term-prompt:#7fb3ff;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151d; --surface:#1a1f2a; --sunken:#222836; --line:#2f3646;
+  --fg:#e6e9f1; --muted:#9aa2b5;
+  --accent:#7d9cff; --accent-soft:#232d4a;
+  --ok:#5fcf93; --ok-soft:#173326; --bad:#ff8a7e; --bad-soft:#3a1f1d;
+  --hint:#f0c060; --hint-soft:#352b17;
+  --term-bg:#0c0f16; --term-fg:#d8e0f2; --term-prompt:#7fb3ff;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:760px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.2}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+p code,li code,td code{background:var(--sunken);padding:1px 5px;border-radius:4px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column}
+.brand small{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.brand h1{font-size:20px}
+.tabs{display:flex;background:var(--sunken);border-radius:8px;padding:3px;gap:2px}
+.tabs button{border:0;background:none;padding:6px 14px;border-radius:6px;font-weight:500;font-size:14px;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.progress{margin-top:10px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{flex:1;height:6px;background:var(--sunken);border-radius:99px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.bar .b-ok{background:var(--ok)} .bar .b-bad{background:var(--bad)}
+
+/* Filters + navigator */
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 11px;font-size:13px;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.chip .ct{opacity:.7;margin-left:4px;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:5px;margin-bottom:18px}
+.grid button{height:34px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.grid button.ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}
+.grid button.bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.grid button.cur{outline:2px solid var(--accent);outline-offset:1px}
+.grid button.dim{opacity:.3}
+
+/* Question card */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px}
+.q-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.q-num{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.topic{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--accent)}
+.stem{font-size:17px;margin:0 0 6px}
+.stem-items{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.stem-items li{padding-left:34px;position:relative}
+.stem-items li b{position:absolute;left:0;font-family:var(--f-mono);font-weight:600;color:var(--muted)}
+
+details.ctx{margin:16px 0;background:var(--hint-soft);border-radius:8px;padding:0}
+details.ctx summary{list-style:none;cursor:pointer;padding:10px 14px;font-weight:600;font-size:14px;color:var(--hint);display:flex;justify-content:space-between;gap:8px}
+details.ctx summary::-webkit-details-marker{display:none}
+details.ctx summary::after{content:"mostrar";font-weight:400;font-size:13px}
+details.ctx[open] summary::after{content:"esconder"}
+details.ctx .body{padding:0 14px 12px;font-size:15px}
+details.ctx .body p{margin:0 0 8px} details.ctx .body p:last-child{margin:0}
+details.ctx ul{margin:4px 0 8px;padding-left:20px}
+
+.opts{display:grid;gap:8px;margin-top:6px}
+.opt{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:11px 12px;transition:border-color .15s,background .15s}
+.opt:hover:not([disabled]){border-color:var(--accent);background:var(--accent-soft)}
+.opt[disabled]{cursor:default}
+.opt .l{width:26px;height:26px;border-radius:6px;background:var(--sunken);display:grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:13px}
+.opt .t{min-width:0}
+.opt .why{display:block;font-size:13.5px;color:var(--muted);margin-top:5px}
+.opt.correct{border-color:var(--ok);background:var(--ok-soft)}
+.opt.correct .l{background:var(--ok);color:var(--surface)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.wrong .l{background:var(--bad);color:var(--surface)}
+.opt.faded{opacity:.75}
+
+.verdict{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+.verdict h3{font-size:17px;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.verdict h3.ok{color:var(--ok)} .verdict h3.bad{color:var(--bad)}
+.verdict p{margin:0 0 10px}
+.note{font-size:14px;background:var(--sunken);border-radius:8px;padding:10px 12px;margin-top:10px}
+.note b{color:var(--hint)}
+
+.rwx{border-collapse:collapse;font-family:var(--f-mono);font-size:14px;margin:8px 0;font-variant-numeric:tabular-nums}
+.rwx th,.rwx td{border:1px solid var(--line);padding:4px 10px;text-align:center}
+.rwx th{font-family:var(--f-body);font-weight:600;font-size:12px;color:var(--muted);background:var(--sunken)}
+.tbl-x{overflow-x:auto}
+
+.term{background:var(--term-bg);color:var(--term-fg);font-family:var(--f-mono);font-size:13.5px;border-radius:8px;padding:10px 12px;margin:8px 0;overflow-x:auto;white-space:pre}
+.term .p{color:var(--term-prompt)}
+
+.nav{display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 16px;font-weight:500;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn:disabled{opacity:.4;cursor:default}
+.kbd{font-size:12.5px;color:var(--muted);text-align:center;margin-top:14px}
+kbd{font-family:var(--f-mono);font-size:11.5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--surface)}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+
+/* Resumo */
+.sum{display:grid;gap:16px}
+.sum section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.sum h2{font-size:18px;margin-bottom:10px}
+.sum p{margin:0 0 8px;max-width:65ch}
+.sum table{border-collapse:collapse;width:100%;font-size:14.5px}
+.sum th,.sum td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.sum th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.sum td:first-child{white-space:nowrap;font-weight:600}
+.diagram{overflow-x:auto}
+.diagram svg{display:block;min-width:560px;width:100%;height:auto}
+.diagram rect{fill:var(--sunken);stroke:var(--line)}
+.diagram rect.hot{fill:var(--accent-soft);stroke:var(--accent)}
+.diagram text{fill:var(--fg);font-family:var(--f-body);font-size:14px;font-weight:600}
+.diagram text.lb{fill:var(--muted);font-size:11.5px;font-weight:400}
+.diagram path{stroke:var(--muted);fill:none;stroke-width:1.5}
+.diagram marker path{fill:var(--muted);stroke:none}
+
+.calc{display:grid;grid-template-columns:auto repeat(3,auto) auto;gap:6px 14px;align-items:center;justify-content:start;font-size:14.5px}
+.calc .h{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.calc label{display:flex;align-items:center;gap:5px;font-family:var(--f-mono)}
+.calc input{width:17px;height:17px;accent-color:var(--accent)}
+.calc .dig{font-family:var(--f-mono);font-size:18px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.calc-out{margin-top:12px}
+
+.foot{display:flex;justify-content:center;margin-top:24px}
+@media (max-width:520px){.card{padding:16px}.stem{font-size:16px}.tabs button{padding:6px 10px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="top-row">
+      <div class="brand"><small>Lista para P2 · N1</small><h1>Sistemas Operacionais</h1></div>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-q" aria-selected="true">Questões</button>
+        <button role="tab" id="tab-s" aria-selected="false">Resumo</button>
+      </div>
+    </div>
+    <div class="progress"><div class="bar" id="bar"></div><span id="score"></span></div>
+  </header>
+
+  <main id="view-q">
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="grid"></div>
+    <article class="card" id="card"></article>
+    <div class="nav">
+      <button class="btn" id="prev">← Anterior</button>
+      <button class="btn primary" id="next">Próxima →</button>
+    </div>
+    <p class="kbd">Atalhos: <kbd>A</kbd>–<kbd>E</kbd> respondem · <kbd>←</kbd> <kbd>→</kbd> navegam · <kbd>C</kbd> abre o contexto</p>
+    <div class="foot"><button class="btn" id="reset">Zerar respostas</button></div>
+  </main>
+
+  <main id="view-s" hidden>
+    <div class="sum" id="sum"></div>
+  </main>
+</div>
+
+<script>
+const T = {
+  hist:"Conceitos e história", tipos:"Tipos de SO", proc:"Processos e threads",
+  int:"Interrupções", conc:"Concorrência", linux:"Linux"
+};
+const rwx = (rows)=>`<div class="tbl-x"><table class="rwx"><tr><th></th><th>r (4)</th><th>w (2)</th><th>x (1)</th><th>Soma</th></tr>${rows.map(r=>`<tr><th>${r[0]}</th><td>${r[1][0]?'✓':'–'}</td><td>${r[1][1]?'✓':'–'}</td><td>${r[1][2]?'✓':'–'}</td><td><b>${r[1][0]*4+r[1][1]*2+r[1][2]}</b></td></tr>`).join('')}</table></div>`;
+
+const QS = [
+{n:1,t:"hist",q:"Levando em consideração as 5 gerações de computadores que já foram criadas até hoje, em qual delas houve o surgimento dos sistemas operacionais?",
+o:["Primeira Geração","Segunda Geração","Terceira Geração","Quarta Geração","Quinta Geração"],a:1,
+c:`<p>As gerações são marcadas pela tecnologia do hardware:</p><ul><li><b>1ª (1945–55)</b>: válvulas. Programava-se direto em linguagem de máquina ou fios em painéis. Não havia SO.</li><li><b>2ª (1955–65)</b>: transistores. Surgem os sistemas <b>batch</b> e os primeiros SOs (ex.: FMS, IBSYS).</li><li><b>3ª (1965–80)</b>: circuitos integrados, multiprogramação e tempo compartilhado (OS/360, UNIX).</li><li><b>4ª (1980–)</b>: microprocessadores, PCs, interfaces gráficas.</li><li><b>5ª</b>: IA, computação móvel, redes e nuvem.</li></ul>`,
+e:`Os primeiros sistemas operacionais aparecem na <b>segunda geração</b>, com os transistores. Era preciso automatizar a troca de um job para o próximo, e isso deu origem aos sistemas batch, que já eram um SO rudimentar.`,
+w:["Na 1ª geração não existia SO: o programador operava a máquina diretamente.","Correta. Transistores e sistemas batch trazem os primeiros SOs.","Na 3ª o SO evolui (multiprogramação), mas ele já existia.","A 4ª é a era dos PCs e das interfaces gráficas.","A 5ª é marcada por IA, mobilidade e nuvem."],
+note:`<b>Atenção:</b> alguns livros dizem que o SO "moderno" (com multiprogramação) nasce na 3ª geração. Na forma como a pergunta está escrita ("surgimento"), a resposta esperada costuma ser a 2ª.`},
+
+{n:2,t:"linux",q:"É um comando usado no Linux para alterar as permissões de arquivos e diretórios. Ele permite ajustar permissões de leitura, gravação e execução para proprietários, grupos e outros usuários. Qual é esse comando?",
+o:["changeperm","alterrights","modperm","chmod","Nenhuma das Alternativas"],a:3,
+c:`<p>No Linux todo arquivo tem três grupos de permissão: <b>dono</b> (u), <b>grupo</b> (g) e <b>outros</b> (o). Cada um pode ter <b>r</b> (ler), <b>w</b> (escrever) e <b>x</b> (executar).</p><div class="term"><span class="p">$</span> ls -l relatorio.sh\n-rwxr-x--- 1 maria alunos 512 relatorio.sh</div>`,
+e:`<code>chmod</code> vem de <i>change mode</i>. Exemplos: <code>chmod 755 arquivo</code> (octal) ou <code>chmod u+x arquivo</code> (simbólico).`,
+w:["Não existe no Linux.","Não existe no Linux.","Não existe no Linux.","Correta: change mode.","Existe sim um comando certo: chmod."]},
+
+{n:3,t:"proc",q:"Em relação a Thread, é possível afirmar:",
+o:["É uma aplicação que permite que o sistema operacional execute mais de um trecho de código simultaneamente","É um aplicativo que executa vários processos simultaneamente","É uma abstração que permite que uma aplicação execute mais de um trecho de código simultaneamente","É como uma exceção do sistema operacional, que aborta um programa em execução","É como um processo que executa outros processos simultaneamente"],a:2,
+c:`<p>Um <b>processo</b> é um programa em execução, com memória e recursos próprios. Uma <b>thread</b> é um fluxo de execução <i>dentro</i> do processo. Um processo pode ter várias threads, que dividem a mesma memória.</p><p>Exemplo: no navegador, uma thread desenha a página enquanto outra baixa imagens.</p>`,
+e:`Thread é uma <b>abstração</b> (não um aplicativo) que permite a uma <b>aplicação</b> executar vários trechos do seu código ao mesmo tempo.`,
+w:["Thread não é uma aplicação, e quem ganha vários fluxos é a aplicação, não o SO.","Thread não é aplicativo e não executa processos; ela vive dentro de um processo.","Correta.","Isso lembra uma exceção ou sinal de término, nada a ver com thread.","Thread não executa processos; é o contrário, o processo contém threads."]},
+
+{n:4,t:"tipos",q:"Qual das alternativas não é um tipo de sistema operacional?",
+o:["Batch","Rede","Distribuído","Multi-usuário","Nenhuma das Alternativas"],a:4,
+c:`<p>Classificações comuns de SO:</p><ul><li><b>Monoprogramável</b> ou <b>multiprogramável</b> (batch, tempo compartilhado, tempo real).</li><li><b>Monousuário</b> ou <b>multiusuário</b>.</li><li>Com múltiplos processadores: <b>SO de rede</b> e <b>SO distribuído</b>.</li></ul>`,
+e:`Todos os itens listados são tipos reais de SO, então a resposta é <b>Nenhuma das Alternativas</b>.`,
+w:["Batch é tipo válido (processamento em lote).","SO de rede é tipo válido: máquinas independentes que compartilham recursos.","Distribuído é tipo válido: várias máquinas parecem um sistema só.","Multiusuário é tipo válido: vários usuários ao mesmo tempo.","Correta: todos são tipos de SO."],
+note:`<b>Pegadinha:</b> quando todas as opções parecem certas e existe "Nenhuma das alternativas", confira se ela não é a resposta.`},
+
+{n:5,t:"hist",q:"Em relação às funções de um sistema operacional:",
+items:["Um sistema operacional pode ser caracterizado como um conjunto de rotinas executadas pelo processador, de forma semelhante aos programas dos usuários.","O principal objetivo de um sistema operacional é gerenciar os componentes de hardware, como processador, memória principal, discos, teclado, entre outros, e fornecer aos programas do usuário uma interface com o hardware mais simples de ser utilizada.","Sem um sistema operacional, o usuário deveria ter um conhecimento aprofundado de diversos comandos e linguagens em geral para que pudesse manipular o computador, o que tornaria uma prática difícil e com grandes possibilidades de erro."],
+o:["Somente I está correta","Somente I e III estão corretas","Somente II e III estão corretas","Somente I e II estão corretas","Todas as alternativas estão corretas"],a:4,
+c:`<p>O SO tem duas faces: é um <b>programa</b> como outro qualquer (roda no processador) e é um <b>gerente</b> que esconde a complexidade do hardware, oferecendo uma interface mais simples.</p>`,
+e:`As três afirmações estão corretas. I: o SO é um conjunto de rotinas executadas pelo processador. II: gerencia o hardware e oferece interface simples. III: sem ele, o usuário teria que lidar diretamente com o hardware.`,
+w:["Deixa de fora II e III, que também estão certas.","Deixa de fora a II, que é a definição clássica.","Deixa de fora a I, que também está certa.","Deixa de fora a III, que também está certa.","Correta."]},
+
+{n:6,t:"hist",q:"Um sistema operacional é responsável por coordenar e gerenciar diferentes componentes de um sistema computacional. Qual das seguintes atividades NÃO é uma responsabilidade principal de um sistema operacional?",
+o:["Alocação de recursos de hardware","Execução de aplicativos","Interpretação de linguagens de programação","Controle de periféricos","Nenhuma das Alternativas"],a:2,
+c:`<p>Responsabilidades do SO: gerenciar processador, memória, arquivos e dispositivos de E/S, carregar e executar programas, e dar proteção e segurança.</p><p>Traduzir código-fonte é trabalho de <b>compiladores</b> e <b>interpretadores</b>, que são programas que rodam <i>sobre</i> o SO.</p>`,
+e:`Interpretar linguagens (Python, JavaScript) é função do interpretador, não do SO.`,
+w:["É função do SO: decidir quem usa CPU, memória etc.","É função do SO: carregar o programa e criar o processo.","Correta: isso é papel do interpretador ou compilador.","É função do SO, por meio dos drivers.","Há uma opção que não é do SO: a C."]},
+
+{n:7,t:"hist",q:"O que é um Sistema Operacional?",
+o:["É um programa que monitora a execução de programas;","É um programa que monitora a execução de programas de aplicações e acompanha o Hardware do computador;","É um programa que executa programas de aplicações e controla o Hardware do computador;","É um programa que controla a execução de programas de aplicações e faz a interface entre as aplicações e o Hardware do computador;","Nenhuma das Alternativas"],a:3,
+c:`<p>Pense em camadas: <b>Usuário → Aplicações → Sistema Operacional → Hardware</b>. O SO fica no meio e controla tudo.</p>`,
+e:`A definição completa tem duas partes: <b>controla</b> a execução dos programas e é a <b>interface</b> entre aplicações e hardware. Só a D tem as duas.`,
+w:["Incompleta: só monitorar não basta, o SO controla.","\"Monitora\" e \"acompanha\" são fracos; falta a ideia de interface.","Falta a ideia de interface entre aplicação e hardware.","Correta: controle mais interface.","A D está correta."]},
+
+{n:8,t:"tipos",q:"Uma característica marcante desse tipo de sistema é não exigir a interação do usuário com a aplicação. Exemplos de aplicações processadas por esse sistema são backups e tarefas agendadas. Essa afirmação diz respeito a qual tipo de sistema?",
+o:["Tempo real","Tempo compartilhado","Batch","Virtual","Nuvem"],a:2,
+c:`<ul><li><b>Batch (lote)</b>: os jobs entram numa fila e rodam sem interação. Ex.: backup noturno, folha de pagamento.</li><li><b>Tempo compartilhado</b>: a CPU é dividida em fatias de tempo, com interação do usuário.</li><li><b>Tempo real</b>: precisa responder dentro de um prazo rígido (controle industrial, freio ABS).</li></ul>`,
+e:`"Sem interação" + "backups e tarefas agendadas" é a descrição clássica de <b>batch</b>.`,
+w:["Tempo real exige resposta em prazo fixo, não é sobre falta de interação.","Tempo compartilhado é justamente interativo.","Correta.","Virtualização é outra coisa (máquinas virtuais).","Nuvem é modelo de oferta de serviço, não tipo de SO."]},
+
+{n:9,t:"tipos",q:"Os sistemas operacionais são programas fundamentais que gerenciam recursos e atuam como uma camada intermediária entre o hardware e o usuário. Entre os diversos tipos de sistemas operacionais, o Linux é conhecido por sua versatilidade. O que caracteriza um sistema operacional multiprogramável?",
+o:["Gerencia múltiplos processos simultaneamente.","Capaz de executar apenas um programa por vez.","Limita-se a operar em um único tipo de hardware.","Realiza exclusivamente operações de entrada e saída.","Nenhuma das Alternativas"],a:0,
+c:`<p><b>Monoprogramável</b>: um programa por vez ocupa toda a máquina (ex.: MS-DOS).</p><p><b>Multiprogramável</b>: vários programas ficam na memória e dividem a CPU. Quando um espera E/S, outro usa o processador.</p>`,
+e:`Multiprogramável = vários processos ao mesmo tempo, compartilhando CPU e memória.`,
+w:["Correta.","Isso descreve o monoprogramável.","Não tem relação com multiprogramação.","Um SO faz muito mais que E/S.","A A está correta."]},
+
+{n:10,t:"hist",q:"Em relação aos Sistemas Operacionais, o que é um Driver?",
+o:["Um driver é um software que traduz o que diz um hardware ou um dispositivo para que o computador possa entender;","Um driver é um software que gerencia um hardware;","Um driver é um software que faz a abstração do hardware;","Um driver é um software que controla o que diz um hardware ou um dispositivo para que sistema operacional possa gerenciá-lo","Nenhuma das Alternativas"],a:0,
+c:`<p>Cada fabricante de impressora, placa de vídeo ou mouse fala uma "língua" diferente. O <b>driver</b> é o tradutor: converte os comandos genéricos do SO em comandos específicos daquele dispositivo, e vice-versa.</p>`,
+e:`A ideia central é <b>tradução</b> entre o dispositivo e o computador (o SO). É a definição que a A traz.`,
+w:["Correta: driver é tradutor.","Quem gerencia o hardware é o SO; o driver só faz a ponte.","Abstração do hardware é papel do SO como um todo.","Mistura ideias: o driver não \"controla o que o hardware diz\".","A A está correta."],
+note:`<b>Atenção:</b> B e D parecem plausíveis. Fique com a palavra-chave <i>traduz</i>, que é como esse tema costuma ser cobrado.`},
+
+{n:11,t:"hist",q:"Quanto às funções básicas de um sistema operacional, temos duas principais: facilitar o acesso aos recursos do sistema e compartilhar recursos de forma organizada e protegida. Qual alternativa NÃO está associada a essas duas funções?",
+o:["Gravar dados no disco rígido","Compartilhar espaço de memória entre as aplicações","Permitir que duas aplicações utilizem a mesma área de memória principal","Acessar impressora","Permitir acesso a aplicativos e programas"],a:2,
+c:`<p><b>Facilitar o acesso</b>: o usuário grava um arquivo ou imprime sem saber como o disco ou a impressora funcionam.</p><p><b>Compartilhar com proteção</b>: a memória é <i>dividida</i> entre os programas, mas cada um fica na sua área. Um não pode invadir a área do outro.</p>`,
+e:`Deixar duas aplicações usarem a <b>mesma área</b> de memória quebra a proteção: uma poderia corromper os dados da outra. O SO existe justamente para impedir isso.`,
+w:["Facilitar acesso: o SO esconde os detalhes do disco.","Compartilhar com organização: cada app ganha sua parte.","Correta: viola a proteção.","Facilitar acesso ao periférico.","Facilitar acesso aos programas."],
+note:`<b>Cuidado:</b> B e C parecem iguais. "Compartilhar espaço" é dividir; "mesma área" é sobrepor.`},
+
+{n:12,t:"int",q:"O que são interrupções dentro do contexto de um sistema operacional?",
+o:["São eventos causados por dispositivos externos ao processador","São eventos de relação síncrona com o software","São eventos que bloqueiam o acesso a periféricos de entrada e saída","São eventos que causam a parada total do programa","Nenhuma das Alternativas"],a:0,
+c:`<p><b>Interrupção</b>: vem de fora do programa, de um dispositivo (teclado, disco, timer). É <b>assíncrona</b>: pode chegar a qualquer momento.</p><p><b>Exceção</b>: vem do próprio programa (divisão por zero, acesso inválido). É <b>síncrona</b>: acontece sempre no mesmo ponto se o programa rodar igual.</p>`,
+e:`Interrupção é um evento gerado por dispositivo <b>externo</b> ao processador e assíncrono.`,
+w:["Correta.","Síncrono com o software é a definição de exceção.","Interrupções avisam o processador; não bloqueiam periféricos.","O programa é pausado e depois retomado, não parado de vez.","A A está correta."]},
+
+{n:13,t:"proc",q:"Processos possuem recursos próprios, como memória e arquivos, enquanto as threads compartilham esses recursos dentro do mesmo processo. Qual é a principal diferença entre um processo e uma thread?",
+o:["Um processo é uma parte de um programa, enquanto uma thread é um programa completo.","Threads são uma unidade de execução menor que um processo e podem compartilhar recursos dentro do mesmo processo.","Processos compartilham recursos, enquanto as threads possuem recursos próprios.","Processos executam tarefas únicas, enquanto as threads são multitarefas.","Nenhuma das Alternativas"],a:1,
+c:`<p>Hierarquia: <b>Programa</b> (arquivo no disco) → <b>Processo</b> (programa rodando, com memória própria) → <b>Threads</b> (fluxos dentro do processo, dividindo a memória dele).</p>`,
+e:`A thread é menor que o processo e compartilha os recursos dele. O próprio enunciado entrega a resposta.`,
+w:["Invertido: a thread é que é parte do processo.","Correta.","Invertido: as threads é que compartilham.","Não é essa a diferença; um processo pode ter várias threads.","A B está correta."]},
+
+{n:14,t:"hist",q:"O sistema operacional é a interface entre usuário e máquina. Ele transforma os comandos feitos no mouse ou teclado em ações dos programas e gerencia recursos como a memória RAM. Assinale a alternativa que representa um Sistema Operacional baseado em código aberto.",
+o:["Windows","Linux","IOS","Mac OS","Nenhuma das Alternativas"],a:1,
+c:`<p><b>Código aberto</b>: qualquer pessoa pode ver, modificar e redistribuir o código-fonte. O <b>Linux</b> (kernel criado por Linus Torvalds em 1991) é o exemplo clássico. Windows, iOS e macOS são proprietários.</p>`,
+e:`Linux é open source (licença GPL).`,
+w:["Proprietário (Microsoft).","Correta.","Proprietário (Apple).","Proprietário (Apple), embora tenha partes abertas (Darwin).","A B está correta."]},
+
+{n:15,t:"proc",q:"O uso de múltiplas threads em um processo pode melhorar a eficiência, permitindo que diferentes partes do programa sejam executadas simultaneamente. Qual é uma das vantagens do uso de threads em um processo?",
+o:["Melhora na eficiência ao permitir a execução concorrente de diferentes partes do programa.","Possibilidade de executar apenas um programa por vez.","Menor paralelismo na execução de tarefas.","Maior isolamento de recursos entre diferentes partes do programa.","Nenhuma das Alternativas"],a:0,
+c:`<p>Vantagens das threads: concorrência dentro do mesmo programa, criação e troca mais baratas que processos, e comunicação fácil porque a memória é compartilhada.</p><p>Desvantagem: como a memória é compartilhada, há <b>menos isolamento</b>, e isso exige sincronização.</p>`,
+e:`A vantagem é a eficiência: partes do programa rodam de forma concorrente.`,
+w:["Correta.","Isso é limitação, não vantagem.","Threads aumentam o paralelismo.","Threads compartilham recursos; isolamento é característica de processos.","A A está correta."]},
+
+{n:16,t:"linux",q:"Qual comando do Linux é usado para localizar arquivos e diretórios com base em critérios diversos?",
+o:["searchfiles","locate","query","find","Nenhuma das Alternativas"],a:3,
+c:`<p>Dois comandos de busca no Linux:</p><ul><li><code>find</code>: varre os diretórios na hora e aceita vários critérios (nome, tipo, tamanho, data, dono).</li><li><code>locate</code>: procura só pelo nome, num banco de dados pré-montado. É rápido, mas pode estar desatualizado.</li></ul><div class="term"><span class="p">$</span> find /var/log -name "*.log" -size +10M</div>`,
+e:`"Critérios diversos" aponta para o <code>find</code>.`,
+w:["Não existe.","Existe, mas só busca por nome. A pergunta fala em critérios diversos.","Não existe como comando padrão.","Correta.","A D está correta."]},
+
+{n:17,t:"int",q:"Enquanto um programa é executado, podem ocorrer eventos inesperados, ocasionando um desvio forçado do seu fluxo de execução. A estes eventos denomina-se interrupção ou exceção. Uma interrupção é caracterizada por:",
+o:["Uma interrupção não afeta o fluxo normal do processamento da CPU","Uma interrupção é sempre causada por um evento de chamada de exceção ao programa que está em execução, ou seja, independe da instrução que está sendo executada","Uma interrupção é sempre causada por um evento interno ao programa que está em execução, ou seja, independe da instrução que está sendo executada","A interrupção é gerada por um evento síncrono (resultado direto da execução do programa corrente).","Uma interrupção é sempre causada por um evento externo ao programa que está em execução, ou seja, independe da instrução que está sendo executada"],a:4,
+c:`<div class="tbl-x"><table class="rwx" style="font-family:inherit;text-align:left"><tr><th></th><th>Interrupção</th><th>Exceção</th></tr><tr><th>Origem</th><td>Externa ao programa</td><td>Interna ao programa</td></tr><tr><th>Tempo</th><td>Assíncrona</td><td>Síncrona</td></tr><tr><th>Exemplo</th><td>Tecla, disco, timer</td><td>Divisão por zero</td></tr></table></div>`,
+e:`Interrupção = evento <b>externo</b>, que não depende da instrução sendo executada.`,
+w:["Ela desvia o fluxo, essa é a definição.","Mistura exceção com interrupção.","Evento interno é exceção.","Evento síncrono é exceção.","Correta."]},
+
+{n:18,t:"conc",q:"Quais dos algoritmos abaixo garantem o processo de exclusão mútua?",
+o:["Algoritmo de Dekker e de Peterson;","Algoritmo de Dekker e de Amdahl;","Algoritmo de Amdahl e de Peterson;","Algoritmo de Murray e de Amdahl;","Nenhuma das Alternativas"],a:0,
+c:`<p><b>Exclusão mútua</b>: só um processo por vez entra na região crítica. Soluções clássicas em software:</p><ul><li><b>Dekker</b> (1965): primeira solução correta para 2 processos.</li><li><b>Peterson</b> (1981): versão mais simples, com uma variável <code>turn</code> e flags.</li></ul><p><b>Amdahl</b> não é algoritmo de sincronização. É uma <i>lei</i> sobre o ganho de velocidade com paralelismo.</p>`,
+e:`Dekker e Peterson são os dois algoritmos clássicos de exclusão mútua.`,
+w:["Correta.","Amdahl é uma lei de desempenho.","Amdahl é uma lei de desempenho.","Nenhum dos dois é algoritmo de exclusão mútua.","A A está correta."],
+note:`<b>Dica:</b> "Amdahl" é o distrator. Se aparecer, pode cortar a alternativa.`},
+
+{n:19,t:"conc",q:"O que é uma condição de corrida dentro do escopo dos sistemas operacionais?",
+o:["São situações onde dois ou mais processos acessam dados compartilhados e o resultado final depende da ordem em que os processos são executados.","São situações onde um processo acessa dados compartilhados e o resultado final depende da ordem em que os processos são executados.","São situações onde dois ou mais processos acessam dados locais e o resultado final depende da ordem em que os processos são executados.","São situações onde um processo acessa dados locais e o resultado final depende da ordem em que os processos são executados.","Nenhuma das Alternativas"],a:0,
+c:`<p>Para existir corrida são necessários três ingredientes:</p><ul><li><b>dois ou mais</b> processos;</li><li>dados <b>compartilhados</b>;</li><li>resultado que <b>depende da ordem</b> de execução.</li></ul>`,
+e:`Só a A tem os três ingredientes.`,
+w:["Correta.","Com um processo só não há com quem disputar.","Dados locais não são disputados.","Um processo e dados locais: nenhum conflito possível.","A A está correta."],
+note:`<b>Estratégia:</b> as alternativas só trocam "um/dois ou mais" e "locais/compartilhados". Procure a combinação dois ou mais + compartilhados.`},
+
+{n:20,t:"linux",q:"Numa instalação Linux, Maria é a proprietária (owner) de um arquivo e deseja estabelecer as permissões de modo que ela própria tenha acesso completo, os usuários de seu grupo possam apenas ler e executar, e os demais usuários possam apenas executar. Assinale a notação octal correta para o comando chmod.",
+o:["751","470","610","762","750"],a:0,
+c:`<p>Cada permissão vale um número: <b>r = 4</b>, <b>w = 2</b>, <b>x = 1</b>. Some o que cada classe pode fazer. A ordem dos dígitos é sempre <b>dono, grupo, outros</b>.</p>`,
+e:`${rwx([["Dono",[1,1,1]],["Grupo",[1,0,1]],["Outros",[0,0,1]]])}Resultado: <code>chmod 751 arquivo</code> → <code>rwxr-x--x</code>.`,
+w:["Correta: 7, 5, 1.","4 = só leitura para o dono, e 0 para outros. Errado.","6 = rw-, 1 = --x, 0 = nada. Errado.","6 para o grupo daria escrita, e 2 para outros também.","Os outros ficariam sem execução (0). Quase: falta o último dígito ser 1."]},
+
+{n:21,t:"hist",q:"Os sistemas operacionais evoluíram ao longo das gerações de computadores. Qual foi uma das principais características dos sistemas operacionais desenvolvidos a partir da terceira geração de computadores?",
+o:["Utilização exclusiva de válvulas eletrônicas.","Introdução dos circuitos integrados e da multiprogramação.","Eliminação dos sistemas operacionais.","Utilização exclusiva de cartões perfurados.","Substituição dos computadores por dispositivos mecânicos."],a:1,
+c:`<p>Resumo das gerações: <b>1ª</b> válvulas · <b>2ª</b> transistores e batch · <b>3ª</b> circuitos integrados e multiprogramação · <b>4ª</b> microprocessadores e PCs · <b>5ª</b> IA e nuvem.</p>`,
+e:`A 3ª geração traz os <b>circuitos integrados</b> e a <b>multiprogramação</b>: vários programas na memória dividindo a CPU. Com ela vem também o tempo compartilhado.`,
+w:["Válvulas são da 1ª geração.","Correta.","Absurdo: o SO cresceu muito nessa época.","Cartões perfurados são de 1ª e 2ª.","Absurdo."]},
+
+{n:22,t:"linux",q:"No Linux, um administrador precisa alterar o proprietário de determinado arquivo para outro usuário. Qual comando deve ser utilizado?",
+o:["Chmod","Chown","Chgrp","passwd","mkdir"],a:1,
+c:`<ul><li><code>chmod</code>: muda as <b>permissões</b> (change mode).</li><li><code>chown</code>: muda o <b>dono</b> (change owner).</li><li><code>chgrp</code>: muda o <b>grupo</b> (change group).</li><li><code>passwd</code>: troca a senha. <code>mkdir</code>: cria diretório.</li></ul><div class="term"><span class="p">#</span> chown joao relatorio.txt\n<span class="p">#</span> chown joao:financeiro relatorio.txt</div>`,
+e:`Trocar o proprietário é <code>chown</code>.`,
+w:["Muda permissões, não o dono.","Correta.","Muda só o grupo.","Troca senha.","Cria diretório."]},
+
+{n:23,t:"proc",q:"Quando um processo está aguardando a conclusão de uma operação de entrada e saída, como a leitura de um arquivo no disco, em qual estado ele normalmente se encontra?",
+o:["Executando.","Pronto.","Bloqueado.","Finalizado.","Criado."],a:2,
+c:`<p>Estados de um processo:</p><ul><li><b>Pronto</b>: tem tudo, só espera a vez na CPU.</li><li><b>Executando</b>: está usando a CPU.</li><li><b>Bloqueado</b> (ou em espera): aguarda um evento externo, como E/S.</li></ul><p>Veja o diagrama completo na aba Resumo.</p>`,
+e:`Esperando E/S = <b>Bloqueado</b>. Quando a leitura termina, ele volta para Pronto, e não direto para Executando.`,
+w:["Não está usando a CPU enquanto espera o disco.","Pronto é quem só espera CPU; este espera E/S.","Correta.","Ainda não terminou.","Criado é o estado inicial."]},
+
+{n:24,t:"tipos",q:"Qual alternativa apresenta uma característica de um sistema operacional de tempo compartilhado (time-sharing)?",
+o:["Executa apenas um programa durante toda a utilização do computador.","Não permite interação entre o usuário e o sistema.","Divide o tempo do processador entre diferentes processos e usuários.","Executa exclusivamente tarefas previamente programadas.","Impede que vários usuários utilizem o sistema simultaneamente."],a:2,
+c:`<p>No tempo compartilhado, a CPU é dividida em pequenas fatias de tempo (<b>quantum</b>, ou time-slice). Cada processo ou usuário recebe a sua em rodízio, tão rápido que todos parecem rodar ao mesmo tempo. É interativo.</p>`,
+e:`O nome já diz: <b>divide o tempo</b> do processador.`,
+w:["Isso é monoprogramável.","Sem interação é batch.","Correta.","Tarefas previamente programadas são batch.","É o oposto: permite vários usuários."]},
+
+{n:25,t:"linux",q:"Um administrador deseja localizar todos os arquivos com extensão .txt dentro do diretório /home. Qual comando atende corretamente a essa necessidade?",
+o:[`find /home -name "*.txt"`,`chmod /home "*.txt"`,`locate /home -type directory`,`mkdir /home "*.txt"`,`ls /home -chmod "*.txt"`],a:0,mono:true,
+c:`<p>Sintaxe do find: <code>find &lt;onde&gt; &lt;critério&gt; &lt;valor&gt;</code></p><div class="term"><span class="p">$</span> find /home -name "*.txt"\n/home/maria/notas.txt\n/home/joao/lista.txt</div><p>O <code>*</code> é curinga: qualquer nome terminado em .txt.</p>`,
+e:`<code>find /home -name "*.txt"</code>: procura em /home pelo nome que casa com *.txt.`,
+w:["Correta.","chmod muda permissão, não busca.","locate não usa essa sintaxe, e -type directory nem existe.","mkdir cria pasta.","ls não tem opção -chmod."]},
+
+{n:26,t:"conc",q:"Em sistemas operacionais, a exclusão mútua é um mecanismo utilizado para evitar problemas quando vários processos acessam recursos compartilhados. Qual é o principal objetivo desse mecanismo?",
+o:["Permitir que todos os processos acessem simultaneamente qualquer recurso.","Impedir definitivamente a execução de processos concorrentes.","Garantir que apenas um processo por vez acesse determinada região crítica.","Aumentar a quantidade de memória disponível para os processos.","Eliminar a necessidade de gerenciamento do processador."],a:2,
+c:`<p><b>Região crítica</b>: o trecho de código que mexe no recurso compartilhado.</p><p><b>Exclusão mútua</b>: enquanto um processo está na região crítica, os outros esperam. Ferramentas: semáforos, mutex, monitores, Peterson, Dekker.</p>`,
+e:`Um processo por vez na região crítica.`,
+w:["É o contrário: o objetivo é evitar acesso simultâneo.","Os processos continuam concorrentes; só a região crítica é exclusiva.","Correta.","Não tem relação com memória disponível.","Não tem relação com isso."]},
+
+{n:27,t:"int",q:"Durante a execução de um programa, o processador pode receber uma solicitação de um dispositivo de hardware, como um teclado ou uma placa de rede. O que acontece quando uma interrupção é recebida?",
+o:["O computador é desligado automaticamente.","O processador interrompe temporariamente a execução atual para tratar o evento.","Todos os processos em execução são eliminados.","O sistema operacional deixa de controlar os dispositivos.","A memória principal é automaticamente apagada."],a:1,
+c:`<p>Passo a passo de uma interrupção:</p><ul><li>O processador termina a instrução atual.</li><li>Salva o contexto (registradores, PC).</li><li>Executa a <b>rotina de tratamento</b> da interrupção.</li><li>Restaura o contexto e <b>continua</b> de onde parou.</li></ul>`,
+e:`A interrupção é uma pausa <b>temporária</b>. O processador trata o evento e depois volta ao programa.`,
+w:["Absurdo.","Correta.","Nada é eliminado, só pausado.","É o contrário: o SO trata o dispositivo.","Absurdo."]},
+
+{n:28,t:"proc",q:"Em relação aos processos e threads, analise as afirmações:",
+items:["Um processo representa um programa em execução.","Uma thread é uma unidade de execução que faz parte de um processo.","Threads de um mesmo processo podem compartilhar recursos, como a memória do processo."],
+o:["Somente I está correta.","Somente II está correta.","Somente I e II estão corretas.","Somente II e III estão corretas.","Todas as afirmações estão corretas."],a:4,
+c:`<p>As três frases são as definições básicas que aparecem nas questões 3, 13 e 15. Se você acertou aquelas, esta sai fácil.</p>`,
+e:`I, II e III são as definições corretas de processo, de thread e do compartilhamento de memória.`,
+w:["II e III também estão certas.","I e III também estão certas.","III também está certa.","I também está certa.","Correta."]},
+
+{n:29,t:"linux",q:"Um usuário Linux deseja configurar as permissões de um arquivo com chmod. Proprietário: leitura e escrita. Grupo: somente leitura. Outros usuários: nenhuma permissão. Qual combinação em notação octal deverá ser utilizada?",
+o:["777","755","640","750","644"],a:2,
+c:`<p><b>r = 4</b>, <b>w = 2</b>, <b>x = 1</b>, <b>nada = 0</b>. Ordem: dono, grupo, outros.</p>`,
+e:`${rwx([["Dono",[1,1,0]],["Grupo",[1,0,0]],["Outros",[0,0,0]]])}Resultado: <code>chmod 640 arquivo</code> → <code>rw-r-----</code>.`,
+w:["Todo mundo pode tudo.","Dono rwx, grupo e outros r-x.","Correta: 6, 4, 0.","Dono teria execução (7) e grupo r-x (5).","Outros teriam leitura (4)."]},
+
+{n:30,t:"conc",q:"Considere dois processos que incrementam simultaneamente o valor de uma variável compartilhada. Qual situação pode ocorrer caso não exista um mecanismo adequado de sincronização?",
+o:["O sistema operacional impede automaticamente qualquer acesso à variável.","O resultado final pode ser incorreto devido à ordem de execução das operações.","Os processos deixam de utilizar o processador.","A variável é automaticamente duplicada para cada processo.","O sistema operacional transforma os processos em threads."],a:1,
+c:`<p><code>x = x + 1</code> parece uma operação só, mas são três: <b>ler</b> x, <b>somar</b> 1, <b>gravar</b> x.</p><div class="term">x = 5\nP1 lê 5          P2 lê 5\nP1 grava 6       P2 grava 6\nResultado: 6 (deveria ser 7)</div>`,
+e:`Sem sincronização acontece uma <b>condição de corrida</b>: um incremento se perde e o resultado fica errado.`,
+w:["O SO não faz isso sozinho; é preciso usar mutex ou semáforo.","Correta.","Eles continuam executando normalmente.","Não há duplicação automática; a variável é compartilhada.","Não existe isso."]}
+];
+
+/* ---------- State ---------- */
+const KEY="estudo-p2-so";
+let S={ans:{},idx:0,filter:"all"};
+try{const r=JSON.parse(localStorage.getItem(KEY)||"null");if(r&&r.ans)S=Object.assign(S,r);}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const L="ABCDE";
+
+function list(){
+  return QS.filter(q=>{
+    if(S.filter==="all")return true;
+    if(S.filter==="wrong")return q.n in S.ans && S.ans[q.n]!==q.a;
+    if(S.filter==="todo")return !(q.n in S.ans);
+    return q.t===S.filter;
+  });
+}
+function status(q){if(!(q.n in S.ans))return"";return S.ans[q.n]===q.a?"ok":"bad";}
+
+function renderTop(){
+  const tot=QS.length,ok=QS.filter(q=>status(q)==="ok").length,bad=QS.filter(q=>status(q)==="bad").length;
+  $("bar").innerHTML=`<i class="b-ok" style="width:${ok/tot*100}%"></i><i class="b-bad" style="width:${bad/tot*100}%"></i>`;
+  $("score").textContent=`${ok} certas · ${bad} erradas · ${tot-ok-bad} faltam`;
+}
+function renderFilters(){
+  const defs=[["all","Todas",QS.length],["todo","Não respondidas",QS.filter(q=>!(q.n in S.ans)).length],["wrong","Errei",QS.filter(q=>status(q)==="bad").length]]
+    .concat(Object.keys(T).map(k=>[k,T[k],QS.filter(q=>q.t===k).length]));
+  $("filters").innerHTML=defs.map(([k,l,c])=>`<button class="chip" data-f="${k}" aria-pressed="${S.filter===k}">${l}<span class="ct">${c}</span></button>`).join("");
+}
+function renderGrid(cur){
+  const ids=new Set(list().map(q=>q.n));
+  $("grid").innerHTML=QS.map(q=>`<button data-n="${q.n}" class="${status(q)} ${cur&&cur.n===q.n?'cur':''} ${ids.has(q.n)?'':'dim'}" aria-label="Questão ${q.n}">${q.n}</button>`).join("");
+}
+function renderCard(){
+  const L2=list();
+  if(S.idx>=L2.length)S.idx=Math.max(0,L2.length-1);
+  const q=L2[S.idx];
+  renderTop();renderFilters();renderGrid(q);
+  $("prev").disabled=S.idx<=0; $("next").disabled=S.idx>=L2.length-1;
+  if(!q){$("card").innerHTML=`<div class="empty">${S.filter==="wrong"?"Nenhuma questão errada. Bom sinal.":"Nada aqui. Escolha outro filtro."}</div>`;return;}
+  const done=q.n in S.ans, pick=S.ans[q.n];
+  const items=q.items?`<ol class="stem-items">${q.items.map((t,i)=>`<li><b>${["I","II","III","IV"][i]}.</b>${t}</li>`).join("")}</ol>`:"";
+  const opts=q.o.map((t,i)=>{
+    let cls="opt";
+    if(done){cls+= i===q.a?" correct": i===pick?" wrong":" faded";}
+    const txt=q.mono?`<code>${t.replace(/</g,"&lt;")}</code>`:t;
+    return `<button class="${cls}" data-i="${i}" ${done?"disabled":""}><span class="l">${L[i]}</span><span class="t">${txt}${done?`<span class="why">${q.w[i]}</span>`:""}</span></button>`;
+  }).join("");
+  const right=done&&pick===q.a;
+  const verdict=done?`<div class="verdict"><h3 class="${right?'ok':'bad'}">${right?"Certa":"Resposta certa: "+L[q.a]}</h3><p>${q.e}</p>${q.note?`<div class="note">${q.note}</div>`:""}</div>`:"";
+  $("card").innerHTML=`<div class="q-meta"><span class="topic">${T[q.t]}</span><span class="q-num">Questão ${q.n} de ${QS.length}</span></div>
+    <p class="stem">${q.q}</p>${items}
+    <details class="ctx" id="ctx" ${!done?"open":""}><summary>Contexto rápido</summary><div class="body">${q.c}</div></details>
+    <div class="opts">${opts}</div>${verdict}`;
+}
+
+/* ---------- Events ---------- */
+$("card").addEventListener("click",e=>{
+  const b=e.target.closest(".opt");if(!b||b.disabled)return;
+  const q=list()[S.idx];S.ans[q.n]=+b.dataset.i;save();
+  // keep the same question in view even if the filter would now hide it
+  if(S.filter==="todo"){S.filter="all";S.idx=QS.indexOf(q);}
+  renderCard();
+});
+$("filters").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;S.filter=b.dataset.f;S.idx=0;save();renderCard();});
+$("grid").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;const n=+b.dataset.n;
+  let i=list().findIndex(q=>q.n===n);
+  if(i<0){S.filter="all";i=n-1;}
+  S.idx=i;save();renderCard();window.scrollTo({top:0});
+});
+const go=d=>{const L2=list();const ni=S.idx+d;if(ni<0||ni>=L2.length)return;S.idx=ni;save();renderCard();};
+$("prev").onclick=()=>go(-1); $("next").onclick=()=>go(1);
+let armed=false;
+$("reset").onclick=e=>{
+  if(!armed){armed=true;e.target.textContent="Clique de novo para confirmar";setTimeout(()=>{armed=false;e.target.textContent="Zerar respostas";},3000);return;}
+  armed=false;S={ans:{},idx:0,filter:"all"};save();e.target.textContent="Zerar respostas";renderCard();
+};
+document.addEventListener("keydown",e=>{
+  if($("view-q").hidden||e.ctrlKey||e.metaKey||e.altKey||/INPUT|TEXTAREA/.test(e.target.tagName))return;
+  const k=e.key.toUpperCase();
+  if(k==="ARROWRIGHT")go(1); else if(k==="ARROWLEFT")go(-1);
+  else if(k==="C"){const d=$("ctx");if(d)d.open=!d.open;}
+  else if(L.includes(k)&&k.length===1){const b=document.querySelector(`.opt[data-i="${L.indexOf(k)}"]`);if(b&&!b.disabled)b.click();}
+});
+
+/* ---------- Tabs ---------- */
+function tab(which){
+  $("tab-q").setAttribute("aria-selected",which==="q");$("tab-s").setAttribute("aria-selected",which==="s");
+  $("view-q").hidden=which!=="q";$("view-s").hidden=which!=="s";
+  try{localStorage.setItem(KEY+"-tab",which)}catch(e){}
+}
+$("tab-q").onclick=()=>tab("q");$("tab-s").onclick=()=>tab("s");
+
+/* ---------- Resumo ---------- */
+$("sum").innerHTML=`
+<section><h2>Gerações de computadores</h2><div class="tbl-x"><table>
+<tr><th>Geração</th><th>Hardware</th><th>O que muda no SO</th></tr>
+<tr><td>1ª · 1945–55</td><td>Válvulas</td><td>Não existe SO. Programação em linguagem de máquina e painéis.</td></tr>
+<tr><td>2ª · 1955–65</td><td>Transistores</td><td><b>Surgem os primeiros SOs</b>: sistemas batch.</td></tr>
+<tr><td>3ª · 1965–80</td><td>Circuitos integrados</td><td>Multiprogramação, tempo compartilhado, UNIX.</td></tr>
+<tr><td>4ª · 1980–</td><td>Microprocessadores</td><td>PCs, interfaces gráficas, redes.</td></tr>
+<tr><td>5ª</td><td>Chips de altíssima integração</td><td>IA, mobilidade, nuvem, sistemas distribuídos.</td></tr>
+</table></div></section>
+
+<section><h2>Tipos de sistema operacional</h2><div class="tbl-x"><table>
+<tr><th>Tipo</th><th>Ideia central</th></tr>
+<tr><td>Batch</td><td>Fila de jobs sem interação. Backups, tarefas agendadas.</td></tr>
+<tr><td>Tempo compartilhado</td><td>CPU dividida em fatias de tempo; interativo.</td></tr>
+<tr><td>Tempo real</td><td>Resposta dentro de prazo rígido.</td></tr>
+<tr><td>Monoprogramável</td><td>Um programa por vez.</td></tr>
+<tr><td>Multiprogramável</td><td>Vários processos na memória dividindo a CPU.</td></tr>
+<tr><td>Multiusuário</td><td>Vários usuários ao mesmo tempo.</td></tr>
+<tr><td>De rede</td><td>Máquinas independentes que compartilham recursos.</td></tr>
+<tr><td>Distribuído</td><td>Várias máquinas que parecem um único sistema.</td></tr>
+</table></div></section>
+
+<section><h2>Estados de um processo</h2>
+<div class="diagram"><svg viewBox="0 0 640 210" role="img" aria-label="Diagrama de estados: Criado vai para Pronto; Pronto vai para Executando quando escalonado; Executando volta para Pronto no fim do quantum; Executando vai para Bloqueado ao esperar E/S; Bloqueado volta para Pronto quando a E/S termina; Executando vai para Finalizado.">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<rect x="8" y="40" width="100" height="40" rx="8"/><text x="58" y="65" text-anchor="middle">Criado</text>
+<rect x="170" y="40" width="110" height="40" rx="8"/><text x="225" y="65" text-anchor="middle">Pronto</text>
+<rect class="hot" x="370" y="40" width="130" height="40" rx="8"/><text x="435" y="65" text-anchor="middle">Executando</text>
+<rect x="536" y="40" width="98" height="40" rx="8"/><text x="585" y="65" text-anchor="middle">Finalizado</text>
+<rect x="270" y="150" width="120" height="40" rx="8"/><text x="330" y="175" text-anchor="middle">Bloqueado</text>
+<path d="M108,60 L168,60" marker-end="url(#ar)"/>
+<path d="M280,50 L368,50" marker-end="url(#ar)"/><text class="lb" x="324" y="42" text-anchor="middle">escalonado</text>
+<path d="M370,72 L282,72" marker-end="url(#ar)"/><text class="lb" x="326" y="94" text-anchor="middle">fim do quantum</text>
+<path d="M500,60 L534,60" marker-end="url(#ar)"/>
+<path d="M430,80 L370,150" marker-end="url(#ar)"/><text class="lb" x="455" y="125">espera E/S</text>
+<path d="M290,150 L240,82" marker-end="url(#ar)"/><text class="lb" x="160" y="125">E/S concluída</text>
+</svg></div>
+<p>Esperando disco ou teclado = <b>Bloqueado</b>. Quando a E/S termina, o processo volta para <b>Pronto</b>, não direto para Executando.</p></section>
+
+<section><h2>Processo, thread, interrupção</h2><div class="tbl-x"><table>
+<tr><th>Termo</th><th>Em uma linha</th></tr>
+<tr><td>Processo</td><td>Programa em execução, com memória e recursos próprios.</td></tr>
+<tr><td>Thread</td><td>Unidade de execução menor, dentro do processo, que compartilha a memória dele.</td></tr>
+<tr><td>Interrupção</td><td>Evento <b>externo</b> e <b>assíncrono</b> (teclado, disco, timer). A CPU pausa, trata e volta.</td></tr>
+<tr><td>Exceção</td><td>Evento <b>interno</b> e <b>síncrono</b>, causado pela instrução (ex.: divisão por zero).</td></tr>
+<tr><td>Driver</td><td>Software que traduz entre o dispositivo e o SO.</td></tr>
+</table></div></section>
+
+<section><h2>Concorrência</h2><div class="tbl-x"><table>
+<tr><th>Termo</th><th>Em uma linha</th></tr>
+<tr><td>Região crítica</td><td>Trecho de código que acessa o recurso compartilhado.</td></tr>
+<tr><td>Exclusão mútua</td><td>Só um processo por vez dentro da região crítica.</td></tr>
+<tr><td>Condição de corrida</td><td>2+ processos, dado compartilhado, resultado depende da ordem.</td></tr>
+<tr><td>Dekker · Peterson</td><td>Algoritmos clássicos de exclusão mútua. (Amdahl é lei de desempenho.)</td></tr>
+</table></div></section>
+
+<section><h2>Comandos Linux da lista</h2><div class="tbl-x"><table>
+<tr><th>Comando</th><th>Para quê</th></tr>
+<tr><td><code>chmod</code></td><td>Muda permissões. <code>chmod 640 arq</code></td></tr>
+<tr><td><code>chown</code></td><td>Muda o dono. <code>chown joao arq</code></td></tr>
+<tr><td><code>chgrp</code></td><td>Muda o grupo.</td></tr>
+<tr><td><code>find</code></td><td>Busca com vários critérios. <code>find /home -name "*.txt"</code></td></tr>
+<tr><td><code>locate</code></td><td>Busca rápida só por nome, num banco pré-montado.</td></tr>
+<tr><td><code>passwd</code> · <code>mkdir</code></td><td>Troca senha · cria diretório.</td></tr>
+</table></div></section>
+
+<section><h2>Calculadora chmod</h2>
+<p>Marque as permissões e veja o número. Bom para treinar as questões 20 e 29.</p>
+<div class="calc" id="calc">
+<span></span><span class="h">Ler (4)</span><span class="h">Escrever (2)</span><span class="h">Executar (1)</span><span class="h">Dígito</span>
+${["Dono","Grupo","Outros"].map((r,ri)=>`<span>${r}</span>${["r","w","x"].map((p,pi)=>`<label><input type="checkbox" id="c${ri}${pi}" data-r="${ri}" data-v="${[4,2,1][pi]}">${p}</label>`).join("")}<span class="dig" id="d${ri}">0</span>`).join("")}
+</div>
+<div class="term calc-out" id="calc-out"></div>
+</section>`;
+
+function calc(){
+  const d=[0,0,0];let sym="";
+  for(let r=0;r<3;r++)for(let p=0;p<3;p++){const c=$("c"+r+p);if(c.checked)d[r]+=+c.dataset.v;sym+=c.checked?"rwx"[p]:"-";}
+  d.forEach((v,i)=>$("d"+i).textContent=v);
+  $("calc-out").innerHTML=`<span class="p">$</span> chmod ${d.join("")} arquivo\n<span class="p">$</span> ls -l arquivo\n-${sym} 1 maria alunos 0 arquivo`;
+}
+$("calc").addEventListener("change",calc);
+// start the calculator on question 20's answer (751)
+[[0,0],[0,1],[0,2],[1,0],[1,2],[2,2]].forEach(([r,p])=>$("c"+r+p).checked=true);
+calc();
+
+let startTab="q";try{startTab=localStorage.getItem(KEY+"-tab")||"q"}catch(e){}
+tab(startTab);
+renderCard();
+</script>
+</body>
+</html>
